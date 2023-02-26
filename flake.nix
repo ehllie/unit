@@ -13,6 +13,19 @@
         naersk' = final.callPackage naersk { };
         unit = naersk'.buildPackage {
           src = self;
+
+          nativeBuildInputs = final.lib.attrValues {
+            inherit (final)
+              installShellFiles;
+          };
+
+          postInstall = ''
+            installShellCompletion --cmd unit \
+              --bash <($out/bin/unit --print-completion bash) \
+              --fish <($out/bin/unit --print-completion fish) \
+              --zsh <($out/bin/unit --print-completion zsh)
+          '';
+
           passthru = rec {
             cache = shell;
 
@@ -21,6 +34,8 @@
 
               packages = final.lib.attrValues {
                 inherit (final)
+                  cargo
+                  rustc
                   rust-analyzer
                   clippy
                   rustfmt;
