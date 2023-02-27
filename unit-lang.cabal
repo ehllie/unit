@@ -1,0 +1,49 @@
+cabal-version:   3.0
+name:            unit-lang
+version:         0.1.0.0
+synopsis:        A small personal language project
+
+-- description:
+license:         MPL-2.0
+license-file:    LICENSE
+author:          Elizabeth Paź
+maintainer:      me@ehllie.xyz
+
+-- copyright:
+category:        Language
+build-type:      Simple
+extra-doc-files: CHANGELOG.md
+
+-- extra-source-files:
+
+common common
+  ghc-options:      -Wall
+  default-language: GHC2021
+  build-depends:    base
+
+library
+  import:          common
+  exposed-modules: MyLib
+
+  -- other-modules:
+  -- other-extensions:
+  hs-source-dirs:  src
+
+executable unit
+  import:         common
+  main-is:        Main.hs
+
+  -- other-modules:
+  -- other-extensions:
+  build-depends:  unit-lang
+  hs-source-dirs: app
+
+test-suite unit-test
+  import:         common
+
+  -- other-modules:
+  -- other-extensions:
+  type:           exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is:        Main.hs
+  build-depends:  unit-lang

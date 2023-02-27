@@ -8,47 +8,41 @@
     };
   };
   outputs = { self, nixpkgs, flake-utils, naersk }: {
-    overlays.default = final: prev:
-      let
-        naersk' = final.callPackage naersk { };
-        unit = naersk'.buildPackage {
-          src = self;
+    overlays.default = final: prev: rec{
+      unit =
+        let
+          inherit (final) lib;
+          inherit (prev.haskell.lib.compose)
+            overrideCabal generateOptparseApplicativeCompletion;
+          compiler = final.haskell.packages.ghc92;
 
-          nativeBuildInputs = final.lib.attrValues {
-            inherit (final)
-              installShellFiles;
-          };
+          fixCyclicReference = overrideCabal (_: {
+            enableSeparateBinOutput = false;
+          });
 
-          postInstall = ''
-            installShellCompletion --cmd unit \
-              --bash <($out/bin/unit --print-completion bash) \
-              --fish <($out/bin/unit --print-completion fish) \
-              --zsh <($out/bin/unit --print-completion zsh)
-          '';
-
-          passthru = rec {
-            cache = shell;
-
-            shell = final.mkShell {
-              inputsFrom = [ unit ];
-
-              packages = final.lib.attrValues {
-                inherit (final)
-                  cargo
-                  rustc
-                  rust-analyzer
-                  clippy
-                  rustfmt;
+          overrides = [
+            (overrideCabal (old: {
+              passthru = rec {
+                shell = unit.env.overrideAttrs
+                  (old: {
+                    nativeBuildInputs = old.nativeBuildInputs or [ ] ++
+                      [
+                        (compiler.haskell-language-server.overrideScope (_:_: {
+                          ormolu = fixCyclicReference compiler.ormolu;
+                        }))
+                      ];
+                  });
+                cache = final.symlinkJoin {
+                  name = "unit-cache";
+                  paths = shell.nativeBuildInputs ++ [ final.cabal2nix ];
+                };
               };
+            }))
+          ];
 
-              shellHook = ''
-                export PATH=$PWD/target/debug:$PATH
-              '';
-            };
-          };
-        };
-      in
-      { inherit unit; };
+        in
+        lib.pipe (compiler.developPackage { root = self; }) overrides;
+    };
 
   } // flake-utils.lib.eachDefaultSystem (system:
     let
