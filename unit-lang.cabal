@@ -17,17 +17,28 @@ extra-doc-files: CHANGELOG.md
 -- extra-source-files:
 
 common common
-  ghc-options:      -Wall
-  default-language: GHC2021
-  build-depends:    base
+  ghc-options:        -Wall
+  default-language:   GHC2021
+  default-extensions:
+    BlockArguments
+    OverloadedStrings
+
+  build-depends:
+    , base
+    , text
 
 library
   import:          common
-  exposed-modules: MyLib
+  exposed-modules:
+    Ast
+    Parser
 
-  -- other-modules:
   -- other-extensions:
   hs-source-dirs:  src
+  build-depends:
+    , containers
+    , megaparsec
+    , parser-combinators
 
 executable unit
   import:         common
@@ -37,6 +48,8 @@ executable unit
   -- other-extensions:
   build-depends:  unit-lang
   hs-source-dirs: app
+  build-depends:  optparse-applicative
+  other-modules:  Cli
 
 test-suite unit-test
   import:         common

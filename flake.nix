@@ -2,18 +2,13 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
-    naersk = {
-      url = "github:nix-community/naersk";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
-  outputs = { self, nixpkgs, flake-utils, naersk }: {
+  outputs = { self, nixpkgs, flake-utils }: {
     overlays.default = final: prev: rec{
       unit =
         let
           inherit (final) lib;
-          inherit (prev.haskell.lib.compose)
-            overrideCabal generateOptparseApplicativeCompletion;
+          inherit (prev.haskell.lib.compose) overrideCabal;
           compiler = final.haskell.packages.ghc92;
 
           fixCyclicReference = overrideCabal (_: {
@@ -23,21 +18,26 @@
           overrides = [
             (overrideCabal (old: {
               passthru = rec {
-                shell = unit.env.overrideAttrs
-                  (old: {
-                    nativeBuildInputs = old.nativeBuildInputs or [ ] ++
-                      [
-                        (compiler.haskell-language-server.overrideScope (_:_: {
-                          ormolu = fixCyclicReference compiler.ormolu;
-                        }))
-                      ];
-                  });
+                shell = final.mkShell {
+                  inputsFrom = [ unit ];
+                  packages = [
+                    (compiler.haskell-language-server.overrideScope (_:_: {
+                      ormolu = fixCyclicReference compiler.ormolu;
+                    }))
+                  ];
+
+                  shellHook = ''
+                    alias unit="cabal run -- unit"
+                  '';
+                };
+
                 cache = final.symlinkJoin {
                   name = "unit-cache";
                   paths = shell.nativeBuildInputs ++ [ final.cabal2nix ];
                 };
               };
             }))
+            (compiler.generateOptparseApplicativeCompletions [ "unit" ])
           ];
 
         in
