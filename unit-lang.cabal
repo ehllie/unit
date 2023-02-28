@@ -31,6 +31,7 @@ library
   import:          common
   exposed-modules:
     Ast
+    Eval
     Parser
 
   -- other-extensions:
@@ -38,6 +39,7 @@ library
   build-depends:
     , containers
     , megaparsec
+    , mtl
     , parser-combinators
 
 executable unit

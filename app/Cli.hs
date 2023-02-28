@@ -4,6 +4,7 @@ import Options.Applicative (
   Alternative ((<|>)),
   Parser,
   execParser,
+  flag,
   fullDesc,
   help,
   helper,
@@ -20,7 +21,7 @@ import Options.Applicative (
 data Input = File FilePath | Expr String
   deriving (Show)
 
-newtype Args = Args {input :: Input}
+data Args = Args {input :: Input, ast :: Bool}
   deriving (Show)
 
 parseInput :: Parser Input
@@ -30,7 +31,10 @@ parseInput = file <|> expr
   expr = Expr <$> strOption (long "expr" <> short 'e' <> metavar "EXPR" <> help "Expression to evaluate")
 
 parseArgs :: Parser Args
-parseArgs = Args <$> parseInput
+parseArgs =
+  Args
+    <$> parseInput
+    <*> flag False True (long "ast" <> short 'a' <> help "Print the AST and exit")
 
 execArgsParser :: IO Args
 execArgsParser =
