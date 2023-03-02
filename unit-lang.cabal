@@ -22,9 +22,12 @@ common common
   default-extensions:
     BlockArguments
     OverloadedStrings
+    QuasiQuotes
 
   build-depends:
     , base
+    , neat-interpolation
+    , string-interpolate
     , text
 
 library
@@ -55,10 +58,12 @@ executable unit
 
 test-suite unit-test
   import:         common
-
-  -- other-modules:
-  -- other-extensions:
   type:           exitcode-stdio-1.0
   hs-source-dirs: test
   main-is:        Main.hs
-  build-depends:  unit-lang
+  build-depends:
+    , hspec
+    , hspec-contrib
+    , HUnit
+    , QuickCheck
+    , unit-lang

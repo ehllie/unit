@@ -1,0 +1,3 @@
+packages: .
+package unit-lang
+  test-show-details: direct
