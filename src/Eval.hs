@@ -1,8 +1,7 @@
-module Eval (eval, runEval) where
+module Eval (eval, runEval, Object (..)) where
 
 import Control.Monad.Except
 import Control.Monad.RWS.Lazy
-import Control.Monad.Reader
 import Data.Map.Lazy (Map)
 import qualified Data.Map.Lazy as M
 import Data.Set (Set)
@@ -19,14 +18,14 @@ data Err
 
 type Env = Map Text Object
 
-type EvalRes = ReaderT Env (Except Err)
+type EvalRes = ExceptT Err (RWS Env [String] ())
 
 data Object
   = PrimInt Integer
   | PrimReal Double
   | PrimStr Text
   | PrimBool Bool
-  | Function {params :: [Text], body :: Expr}
+  | Function {params :: [Text], body :: Expr, env :: Env}
   | Thunk {expr :: Expr, env :: Env}
   deriving (Eq)
 
@@ -53,10 +52,8 @@ freeVars (Ast.Cond condExp thenExp elseExp) = freeVars condExp `S.union` freeVar
 freeVars (Ast.Call funcExpr args) = freeVars funcExpr `S.union` S.unions (map freeVars args)
 freeVars (Ast.Def params body) = freeVars body `S.difference` S.fromList params
 
-mkThunk :: Expr -> EvalRes Object
-mkThunk expr = do
-  env <- asks (M.filterWithKey (\k _ -> k `S.member` freeVars expr))
-  return Thunk{expr, env}
+captureEnv :: Expr -> Env -> Env
+captureEnv expr = M.filterWithKey (\k _ -> k `S.member` freeVars expr)
 
 eval :: Expr -> EvalRes Object
 eval (Ast.Literal (Ast.Int lit)) = return $ PrimInt lit
@@ -100,7 +97,12 @@ eval (Ast.Binary op lhsExpr rhsExpr) = do
     (Ast.NEq, _, _) -> return $ PrimBool (lhs /= rhs)
     _ -> throwError TypeMismatch
 eval (Ast.Let letEnv body) = do
-  bindings <- mapM mkThunk letEnv
+  env <- ask
+  let bindings =
+        let mergedEnv = env `M.union` bindings
+            letThunk expr = Thunk{expr, env = captureEnv expr mergedEnv}
+         in M.map letThunk letEnv
+  tell ["Let bindings: " ++ show bindings]
   local (bindings `M.union`) $ eval body
 eval (Ast.Cond condExp thenExp elseExp) = do
   cond <- strict =<< eval condExp
@@ -111,12 +113,28 @@ eval (Ast.Cond condExp thenExp elseExp) = do
 eval (Ast.Call funcExpr args) = do
   func <- strict =<< eval funcExpr
   case func of
-    Function{params, body} -> do
+    Function{params, body, env} -> do
       when (length params /= length args) $ throwError TypeMismatch
-      argClosures <- mapM mkThunk args
-      local (M.fromList (zip params argClosures) `M.union`) $ eval body
+      argClosures <- forM args \expr -> do
+        env <- asks $ captureEnv expr
+        if null env
+          then do
+            tell ["Argument is a pure value"]
+            eval expr
+          else do
+            tell ["Argument is a closure"]
+            return Thunk{expr, env}
+      local (M.fromList (zip params argClosures) `M.union` env `M.union`) $ eval body
     _ -> throwError TypeMismatch
-eval (Ast.Def params body) = return $ Function{params, body}
+eval fn@(Ast.Def params body) = do
+  currentEnv <- ask
+  tell ["Current env: " ++ show currentEnv]
+  env <- asks $ captureEnv fn
+  tell ["Env captured in thunk: " ++ show env]
+  if null env
+    then tell ["Returning a pure function"]
+    else tell ["Returning a closure"]
+  return Function{params, body, env}
 
-runEval :: Expr -> Either Err Object
-runEval expr = runExcept $ runReaderT (strict =<< eval expr) M.empty
+runEval :: Expr -> (Either Err Object, [String])
+runEval expr = evalRWS (runExceptT (strict =<< eval expr)) M.empty ()

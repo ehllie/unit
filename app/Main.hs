@@ -18,7 +18,8 @@ main = do
       if ast
         then print expr
         else case runEval expr of
-          Right obj -> print obj
-          Left err -> print err
+          (ret, evalLog) -> do
+            mapM_ putStrLn evalLog
+            either print print ret
     Left err -> putStrLn $ errorBundlePretty err
   return ()
